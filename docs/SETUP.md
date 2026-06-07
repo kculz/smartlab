@@ -55,7 +55,7 @@ nano .env
 
 Update these values:
 ```env
-DB_HOST=localhost
+DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_NAME=smartlab_db
 DB_USER=root
@@ -72,6 +72,8 @@ EMAIL_PASSWORD=your-app-specific-password
 EMAIL_FROM=noreply@smartlab.local
 FRONTEND_URL=http://localhost:5173
 ```
+
+On Windows, if `localhost` gives you a connection error, change `DB_HOST` to `127.0.0.1`.
 
 Install dependencies and start:
 ```bash
