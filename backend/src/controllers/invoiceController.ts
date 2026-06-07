@@ -182,7 +182,7 @@ export const createInvoice = async (
       currency: currency || 'USD',
       items: buildInvoiceItemsEmailSummary(tests),
       balanceDue: totalAmount.toFixed(2),
-    }).catch((emailError) => {
+    }).catch((emailError: unknown) => {
       logWarn('Invoice created email failed', {
         invoiceId: invoice.id,
         email: patient.email,
