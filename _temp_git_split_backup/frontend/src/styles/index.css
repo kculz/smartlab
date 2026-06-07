@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-slate-950 text-slate-100 antialiased;
+    background:
+      radial-gradient(circle at top left, rgba(96, 165, 250, 0.24), transparent 30%),
+      radial-gradient(circle at 80% 20%, rgba(34, 197, 94, 0.14), transparent 24%),
+      linear-gradient(180deg, #0b1120 0%, #0f172a 48%, #111827 100%);
+  }
+
+  a {
+    @apply transition duration-200 ease-out;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply rounded-[28px] border border-white/10 bg-white/10 shadow-2xl shadow-black/30 backdrop-blur-xl;
+  }
+
+  .soft-card {
+    @apply rounded-2xl border border-white/10 bg-slate-900/70 shadow-xl shadow-black/20 backdrop-blur-xl;
+  }
+
+  .section-chip {
+    @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-slate-100 shadow-lg shadow-black/20 backdrop-blur;
+  }
+
+  .primary-gradient {
+    @apply bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 text-white;
+  }
+
+  .subtle-border {
+    @apply border border-white/10;
+  }
+}
+
+@layer utilities {
+  .animate-float {
+    animation: float 8s ease-in-out infinite;
+  }
+
+  .animate-fade-up {
+    animation: fade-up 0.7s ease-out both;
+  }
+
+  .animate-glow {
+    animation: glow 6s ease-in-out infinite;
+  }
+}
+
+body {
+  @apply text-slate-100;
+}
+
+.container {
+  @apply max-w-7xl mx-auto px-4;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    opacity: 0.65;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
