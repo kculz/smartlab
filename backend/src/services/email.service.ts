@@ -52,7 +52,7 @@ function getEmailSetting(key: string): string {
   return (process.env[key] || '').trim();
 }
 
-const parseBooleanSetting = (value: string | undefined, fallback: boolean): boolean => {
+function parseBooleanSetting(value: string | undefined, fallback: boolean): boolean {
   if (!value) {
     return fallback;
   }
@@ -67,7 +67,7 @@ const parseBooleanSetting = (value: string | undefined, fallback: boolean): bool
   }
 
   return fallback;
-};
+}
 
 function hasSmtpConfig(): boolean {
   return Boolean(
