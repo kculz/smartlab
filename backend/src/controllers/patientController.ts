@@ -4,7 +4,10 @@ import User from '../models/User.js';
 import sequelize from '../config/database.js';
 import { hashPassword } from '../utils/password.js';
 import { DEFAULT_PATIENT_PASSWORD } from '../constants/enums.js';
-import { sendWelcomePatientEmail } from '../services/notification.service.js';
+import {
+  queueNotificationDelivery,
+  sendWelcomePatientEmail,
+} from '../services/notification.service.js';
 import { Op } from 'sequelize';
 import { logError, logInfo, logWarn } from '../utils/logger.js';
 
@@ -66,9 +69,7 @@ export const createPatient = async (req: Request, res: Response): Promise<void> 
 
     const patientAccount = await User.findOne({ where: { email } });
 
-    void sendWelcomePatientEmail(patient).catch((emailError: unknown) => {
-      logWarn('Welcome patient email failed', { email, error: emailError });
-    });
+    queueNotificationDelivery('Welcome patient email', sendWelcomePatientEmail(patient));
 
     res.status(201).json({
       success: true,

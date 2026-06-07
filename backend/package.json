@@ -8,6 +8,7 @@
     "start": "node dist/src/index.js",
     "dev": "nodemon --watch src --ext ts,json --exec \"node --loader ts-node/esm\" src/index.ts",
     "build": "tsc",
+    "test:email": "node --loader ts-node/esm src/scripts/test-email-connection.ts",
     "migrate": "sequelize-cli db:migrate",
     "migrate:undo": "sequelize-cli db:migrate:undo:all",
     "seed": "sequelize-cli db:seed:all",

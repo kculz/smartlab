@@ -5,7 +5,9 @@ import SampleTest from '../models/SampleTest.js';
 import Test from '../models/Test.js';
 import User from '../models/User.js';
 import Invoice from '../models/Invoice.js';
+import { Op } from 'sequelize';
 import { sendTemplatedEmail } from './email.service.js';
+import { logWarn } from '../utils/logger.js';
 
 type SampleNotificationPayload = {
   patientName: string;
@@ -14,6 +16,7 @@ type SampleNotificationPayload = {
   testNames: string;
   status: string;
   stage: string;
+  subject?: string;
 };
 
 type ResultNotificationPayload = {
@@ -40,12 +43,60 @@ type InvoiceNotificationPayload = {
   itemSummary?: string;
 };
 
+type InternalWorkflowNotificationPayload = {
+  title: string;
+  summary: string;
+  patientName?: string;
+  sampleId?: string;
+  testNames?: string;
+  status?: string;
+  stage?: string;
+  invoiceNumber?: string;
+  totalAmount?: string;
+  currency?: string;
+  actionUrl?: string;
+  actionLabel?: string;
+};
+
+const roleLabels: Record<string, string> = {
+  admin: 'Admin',
+  receptionist: 'Reception',
+  lab_technician: 'Lab',
+  doctor: 'Doctor',
+  nurse: 'Nurse',
+  manager: 'Manager',
+  patient: 'Patient',
+};
+
 const getPortalUrl = (): string => {
   return process.env.FRONTEND_URL || 'http://localhost:5173';
 };
 
 const getPatientFullName = (patient: Patient): string => {
   return `${patient.first_name} ${patient.last_name}`.trim();
+};
+
+const normalizeDisplayValue = (value?: string): string => {
+  return value && value.trim() ? value : 'N/A';
+};
+
+const formatRoleLabel = (role: string): string => {
+  return roleLabels[role] || role;
+};
+
+export const queueNotificationDelivery = <T extends boolean | number>(
+  label: string,
+  job: Promise<T>
+): void => {
+  void job
+    .then((result) => {
+      if (result === false || result === 0) {
+        logWarn(`${label} notification did not reach any recipients`);
+      }
+    })
+    .catch((error) => {
+      logWarn(`${label} notification failed`, { error });
+    });
 };
 
 export const sendWelcomePatientEmail = async (patient: Patient): Promise<boolean> => {
@@ -67,10 +118,11 @@ export const sendSampleStatusUpdateEmail = async ({
   testNames,
   status,
   stage,
+  subject,
 }: SampleNotificationPayload): Promise<boolean> => {
   return sendTemplatedEmail({
     to: email,
-    subject: `Sample Update - ${sampleId}`,
+    subject: subject || `Sample Update - ${sampleId}`,
     template: 'sample-status-update',
     data: {
       patientName,
@@ -81,6 +133,49 @@ export const sendSampleStatusUpdateEmail = async ({
       trackingUrl: `${getPortalUrl()}/track-results/${sampleId}`,
     },
   });
+};
+
+export const sendInternalWorkflowNotificationEmails = async (
+  roles: string[],
+  subject: string,
+  payload: InternalWorkflowNotificationPayload
+): Promise<number> => {
+  const recipients = await User.findAll({
+    where: { role: { [Op.in]: roles }, is_active: true },
+    attributes: ['email', 'full_name', 'role'],
+  });
+
+  if (recipients.length === 0) {
+    return 0;
+  }
+
+  const deliveries = await Promise.allSettled(
+    recipients.map((recipient) =>
+      sendTemplatedEmail({
+        to: recipient.email,
+        subject,
+        template: 'workflow-update',
+        data: {
+          recipientName: recipient.full_name,
+          roleLabel: formatRoleLabel(recipient.role),
+          title: payload.title,
+          summary: payload.summary,
+          patientName: normalizeDisplayValue(payload.patientName),
+          sampleId: normalizeDisplayValue(payload.sampleId),
+          testNames: normalizeDisplayValue(payload.testNames),
+          status: normalizeDisplayValue(payload.status),
+          stage: normalizeDisplayValue(payload.stage),
+          invoiceNumber: normalizeDisplayValue(payload.invoiceNumber),
+          totalAmount: normalizeDisplayValue(payload.totalAmount),
+          currency: normalizeDisplayValue(payload.currency),
+          actionUrl: payload.actionUrl || `${getPortalUrl()}/`,
+          actionLabel: payload.actionLabel || 'Open SmartLab',
+        },
+      })
+    )
+  );
+
+  return deliveries.filter((result) => result.status === 'fulfilled' && result.value).length;
 };
 
 export const sendDoctorApprovalRequestEmails = async (

@@ -65,6 +65,8 @@ PORT=5000
 JWT_SECRET=your-super-secret-key-change-this
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
+EMAIL_ENABLED=true
+EMAIL_TRANSPORT=smtp
 EMAIL_USER=your-email@gmail.com
 EMAIL_PASSWORD=your-app-specific-password
 EMAIL_FROM=noreply@smartlab.local
@@ -152,6 +154,33 @@ If using Gmail:
 1. Enable 2-Step Verification in Gmail account
 2. Generate App Password: https://myaccount.google.com/apppasswords
 3. Use the App Password (not regular password) in .env
+
+For local development, you can skip SMTP entirely by setting:
+```env
+EMAIL_ENABLED=false
+```
+or render messages to the console instead of sending them:
+```env
+EMAIL_TRANSPORT=console
+```
+
+If SMTP auth still fails with `535 Incorrect authentication data`, the backend will keep patient, reception, lab, and doctor workflows running, but you still need valid SMTP credentials for real email delivery.
+
+To test the SMTP connection from the backend, run:
+```bash
+cd backend
+npm run test:email
+```
+
+To also send a real test message, provide a recipient:
+```bash
+npm run test:email -- --to your-email@example.com
+```
+
+To force the SSL port while testing:
+```bash
+npm run test:email -- --port 465 --secure true --to your-email@example.com
+```
 
 ## Next Steps
 

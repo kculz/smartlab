@@ -6,10 +6,39 @@ import Patient from '../models/Patient.js';
 import Test from '../models/Test.js';
 import {
   getSampleEmailContext,
+  queueNotificationDelivery,
+  sendInternalWorkflowNotificationEmails,
   sendSampleStatusUpdateEmail,
 } from '../services/notification.service.js';
 import { logError, logInfo, logWarn } from '../utils/logger.js';
 import sequelize from '../config/database.js';
+
+const getSampleInternalRoles = (stage?: string, status?: string): string[] => {
+  const roles = new Set<string>();
+
+  switch (stage) {
+    case 'Reception':
+      roles.add('receptionist');
+      break;
+    case 'Lab':
+      roles.add('lab_technician');
+      break;
+    case 'Doctor Review':
+      roles.add('receptionist');
+      break;
+    case 'Completed':
+      roles.add('receptionist');
+      break;
+    default:
+      break;
+  }
+
+  if (status === 'Released') {
+    roles.add('receptionist');
+  }
+
+  return [...roles];
+};
 
 export const createSample = async (
   req: Request & { user?: any },
@@ -78,6 +107,48 @@ export const createSample = async (
       },
     });
     logInfo('Create sample successful', { sampleId: sample.id, sampleCode: sample_id });
+
+    const patientName = `${patient.first_name} ${patient.last_name}`.trim();
+    const testNames = tests.map((test) => test.name).join(', ');
+
+    queueNotificationDelivery(
+      'Sample created patient email',
+      sendSampleStatusUpdateEmail({
+        patientName,
+        email: patient.email,
+        sampleId: sample.sample_id,
+        testNames,
+        status: sample.current_status,
+        stage: sample.current_stage,
+        subject: `Sample Registered - ${sample.sample_id}`,
+      })
+    );
+
+    queueNotificationDelivery(
+      'Sample created reception email',
+      sendInternalWorkflowNotificationEmails(['receptionist'], `New sample registered - ${sample.sample_id}`, {
+        title: 'New Sample Registered',
+        summary: `A new sample for ${patientName} has been registered and is ready for reception follow-up.`,
+        patientName,
+        sampleId: sample.sample_id,
+        testNames,
+        status: sample.current_status,
+        stage: sample.current_stage,
+      })
+    );
+
+    queueNotificationDelivery(
+      'Sample created lab email',
+      sendInternalWorkflowNotificationEmails(['lab_technician'], `Sample ready for lab processing - ${sample.sample_id}`, {
+        title: 'Sample Ready for Lab Processing',
+        summary: `A new sample for ${patientName} has been registered and is ready for lab processing.`,
+        patientName,
+        sampleId: sample.sample_id,
+        testNames,
+        status: sample.current_status,
+        stage: sample.current_stage,
+      })
+    );
   } catch (error) {
     logError('Create sample error', { error });
     res.status(500).json({ success: false, message: 'Failed to create sample due to an unexpected server error' });
@@ -178,14 +249,59 @@ export const updateSampleStatus = async (
 
     const emailContext = await getSampleEmailContext(sample.id);
     if (emailContext) {
-      await sendSampleStatusUpdateEmail({
-        patientName: emailContext.patientName,
-        email: emailContext.patient.email,
-        sampleId: emailContext.sample.sample_id,
-        testNames: emailContext.testNames,
-        status: current_status || sample.current_status,
-        stage: current_stage || sample.current_stage,
-      });
+      const nextStage = current_stage || sample.current_stage;
+      const nextStatus = current_status || sample.current_status;
+      const internalRoles = getSampleInternalRoles(nextStage, nextStatus);
+
+      queueNotificationDelivery(
+        'Sample status patient email',
+        sendSampleStatusUpdateEmail({
+          patientName: emailContext.patientName,
+          email: emailContext.patient.email,
+          sampleId: emailContext.sample.sample_id,
+          testNames: emailContext.testNames,
+          status: nextStatus,
+          stage: nextStage,
+          subject: `Sample Status Updated - ${emailContext.sample.sample_id}`,
+        })
+      );
+
+      if (internalRoles.length > 0) {
+        const internalTitle =
+          nextStage === 'Lab'
+            ? 'Sample Ready for Lab Work'
+            : nextStage === 'Doctor Review'
+              ? 'Sample Pending Doctor Review'
+              : nextStage === 'Completed'
+                ? 'Sample Completed'
+                : 'Sample Status Updated';
+
+        const internalSummary =
+          nextStage === 'Lab'
+            ? `Sample ${emailContext.sample.sample_id} is now in the lab stage for processing.`
+            : nextStage === 'Doctor Review'
+              ? `Sample ${emailContext.sample.sample_id} is awaiting doctor review.`
+              : nextStage === 'Completed'
+                ? `Sample ${emailContext.sample.sample_id} has reached completion.`
+                : `Sample ${emailContext.sample.sample_id} status changed to ${nextStatus}.`;
+
+        queueNotificationDelivery(
+          'Sample status internal email',
+          sendInternalWorkflowNotificationEmails(
+            internalRoles,
+            `${internalTitle} - ${emailContext.sample.sample_id}`,
+            {
+              title: internalTitle,
+              summary: internalSummary,
+              patientName: emailContext.patientName,
+              sampleId: emailContext.sample.sample_id,
+              testNames: emailContext.testNames,
+              status: nextStatus,
+              stage: nextStage,
+            }
+          )
+        );
+      }
     }
 
     res.json({

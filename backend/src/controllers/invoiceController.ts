@@ -7,7 +7,10 @@ import InvoicePayment from '../models/InvoicePayment.js';
 import Test from '../models/Test.js';
 import Patient from '../models/Patient.js';
 import User from '../models/User.js';
-import { sendInvoiceCreatedEmail } from '../services/notification.service.js';
+import {
+  queueNotificationDelivery,
+  sendInvoiceCreatedEmail,
+} from '../services/notification.service.js';
 import { INVOICE_STATUS } from '../constants/enums.js';
 import { logError, logInfo, logWarn } from '../utils/logger.js';
 
@@ -174,21 +177,18 @@ export const createInvoice = async (
 
     const invoiceDetails = await loadInvoiceDetails(invoice.id);
 
-    void sendInvoiceCreatedEmail({
-      patientName: `${patient.first_name} ${patient.last_name}`.trim(),
-      email: patient.email,
-      invoiceNumber,
-      totalAmount: totalAmount.toFixed(2),
-      currency: currency || 'USD',
-      items: buildInvoiceItemsEmailSummary(tests),
-      balanceDue: totalAmount.toFixed(2),
-    }).catch((emailError: unknown) => {
-      logWarn('Invoice created email failed', {
-        invoiceId: invoice.id,
+    queueNotificationDelivery(
+      'Invoice created email',
+      sendInvoiceCreatedEmail({
+        patientName: `${patient.first_name} ${patient.last_name}`.trim(),
         email: patient.email,
-        error: emailError,
-      });
-    });
+        invoiceNumber,
+        totalAmount: totalAmount.toFixed(2),
+        currency: currency || 'USD',
+        items: buildInvoiceItemsEmailSummary(tests),
+        balanceDue: totalAmount.toFixed(2),
+      })
+    );
 
     res.status(201).json({
       success: true,

@@ -4,6 +4,8 @@ import SampleTest from '../models/SampleTest.js';
 import Test from '../models/Test.js';
 import {
   getResultEmailContext,
+  queueNotificationDelivery,
+  sendInternalWorkflowNotificationEmails,
   sendDoctorApprovalConfirmationEmail,
   sendDoctorApprovalRequestEmails,
   sendLabResultsReadyEmail,
@@ -56,13 +58,16 @@ export const createResult = async (req: Request, res: Response): Promise<void> =
 
     const emailContext = await getResultEmailContext(sample_test_id);
     if (emailContext && result.status === 'Pending Review') {
-      await sendDoctorApprovalRequestEmails({
-        patientName: emailContext.patientName,
-        sampleId: emailContext.sample.sample_id,
-        testNames: emailContext.test.name,
-        status: emailContext.sample.current_status,
-        stage: emailContext.sample.current_stage,
-      });
+      queueNotificationDelivery(
+        'Doctor approval request email',
+        sendDoctorApprovalRequestEmails({
+          patientName: emailContext.patientName,
+          sampleId: emailContext.sample.sample_id,
+          testNames: emailContext.test.name,
+          status: emailContext.sample.current_status,
+          stage: emailContext.sample.current_stage,
+        })
+      );
     }
 
     res.status(201).json({
@@ -238,23 +243,42 @@ export const approveResult = async (
 
     const emailContext = await getResultEmailContext(result.sample_test_id);
     if (emailContext) {
-      await sendLabResultsReadyEmail({
-        patientName: emailContext.patientName,
-        email: emailContext.patient.email,
-        sampleId: emailContext.sample.sample_id,
-        testName: emailContext.test.name,
-        resultValue: result.value,
-        resultStatus: approvedStatus,
-      });
+      queueNotificationDelivery(
+        'Lab result ready patient email',
+        sendLabResultsReadyEmail({
+          patientName: emailContext.patientName,
+          email: emailContext.patient.email,
+          sampleId: emailContext.sample.sample_id,
+          testName: emailContext.test.name,
+          resultValue: result.value,
+          resultStatus: approvedStatus,
+        })
+      );
 
       if (req.user?.email) {
-        await sendDoctorApprovalConfirmationEmail(req.user.email, {
-          approverName: req.user.email,
+        queueNotificationDelivery(
+          'Doctor approval confirmation email',
+          sendDoctorApprovalConfirmationEmail(req.user.email, {
+            approverName: req.user.email,
+            patientName: emailContext.patientName,
+            sampleId: emailContext.sample.sample_id,
+            testNames: emailContext.test.name,
+          })
+        );
+      }
+
+      queueNotificationDelivery(
+        'Result approved reception email',
+        sendInternalWorkflowNotificationEmails(['receptionist'], `Result approved - ${emailContext.sample.sample_id}`, {
+          title: 'Result Approved',
+          summary: `The result for sample ${emailContext.sample.sample_id} has been approved and the patient has been notified.`,
           patientName: emailContext.patientName,
           sampleId: emailContext.sample.sample_id,
           testNames: emailContext.test.name,
-        });
-      }
+          status: approvedStatus,
+          stage: emailContext.sample.current_stage,
+        })
+      );
     }
 
     res.json({
@@ -306,6 +330,35 @@ export const rejectResult = async (
     // Send sample test back to Pending so lab can re-enter
     if (resultWithSampleTest.SampleTest) {
       await resultWithSampleTest.SampleTest.update({ status: 'Pending' });
+    }
+
+    const emailContext = await getResultEmailContext(result.sample_test_id);
+    if (emailContext) {
+      queueNotificationDelivery(
+        'Result rejected lab email',
+        sendInternalWorkflowNotificationEmails(['lab_technician'], `Result rejected - ${emailContext.sample.sample_id}`, {
+          title: 'Result Rejected',
+          summary: `The doctor rejected the result for sample ${emailContext.sample.sample_id}. Please re-analyse the test.`,
+          patientName: emailContext.patientName,
+          sampleId: emailContext.sample.sample_id,
+          testNames: emailContext.test.name,
+          status: 'Rejected',
+          stage: emailContext.sample.current_stage,
+        })
+      );
+
+      queueNotificationDelivery(
+        'Result rejected reception email',
+        sendInternalWorkflowNotificationEmails(['receptionist'], `Result rejected - ${emailContext.sample.sample_id}`, {
+          title: 'Result Rejected',
+          summary: `The doctor rejected the result for sample ${emailContext.sample.sample_id}. A re-analysis has been requested from the lab.`,
+          patientName: emailContext.patientName,
+          sampleId: emailContext.sample.sample_id,
+          testNames: emailContext.test.name,
+          status: 'Rejected',
+          stage: emailContext.sample.current_stage,
+        })
+      );
     }
 
     res.json({

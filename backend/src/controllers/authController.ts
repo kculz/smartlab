@@ -3,7 +3,10 @@ import { hashPassword, comparePassword } from '../utils/password.js';
 import { generateTokens } from '../utils/jwt.js';
 import User from '../models/User.js';
 import Patient from '../models/Patient.js';
-import { sendWelcomePatientEmail } from '../services/notification.service.js';
+import {
+  queueNotificationDelivery,
+  sendWelcomePatientEmail,
+} from '../services/notification.service.js';
 import { logError, logInfo, logWarn } from '../utils/logger.js';
 
 export const register = async (req: Request, res: Response): Promise<void> => {
@@ -41,7 +44,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         email,
       });
 
-      await sendWelcomePatientEmail(patient);
+      queueNotificationDelivery('Welcome patient email', sendWelcomePatientEmail(patient));
     }
 
     const tokens = generateTokens({
