@@ -3,10 +3,19 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const isDev = process.env.NODE_ENV !== 'production';
+const rejectUnauthorized =
+  process.env.EMAIL_TLS_REJECT_UNAUTHORIZED === undefined
+    ? !isDev
+    : process.env.EMAIL_TLS_REJECT_UNAUTHORIZED === 'true';
+
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: parseInt(process.env.EMAIL_PORT || '587'),
   secure: process.env.EMAIL_PORT === '465',
+  tls: {
+    rejectUnauthorized,
+  },
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASSWORD,
