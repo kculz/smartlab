@@ -213,8 +213,20 @@ export const getInvoices = async (
     const { patient_id, status, limit = 10, offset = 0 } = req.query;
 
     const where: any = {};
-    if (patient_id) where.patient_id = patient_id;
     if (status) where.status = status;
+
+    // Security check: restrict patients to only fetch their own invoices
+    if ((req as any).user?.role === 'patient') {
+      const patient = await Patient.findOne({ where: { user_id: (req as any).user.userId } });
+      if (!patient) {
+        logWarn('Get invoices failed: patient profile not found for user', { userId: (req as any).user.userId });
+        res.status(404).json({ success: false, message: 'Patient profile not found' });
+        return;
+      }
+      where.patient_id = patient.id;
+    } else if (patient_id) {
+      where.patient_id = patient_id;
+    }
 
     const { count, rows } = await Invoice.findAndCountAll({
       where,

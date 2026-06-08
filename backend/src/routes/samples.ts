@@ -20,7 +20,7 @@ router.post(
 router.get(
   '/',
   authMiddleware,
-  roleMiddleware(['receptionist', 'admin', 'lab_technician', 'doctor', 'manager']),
+  roleMiddleware(['receptionist', 'admin', 'lab_technician', 'doctor', 'manager', 'patient']),
   sampleController.getSamples
 );
 

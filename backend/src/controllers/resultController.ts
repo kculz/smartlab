@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Result from '../models/Result.js';
 import SampleTest from '../models/SampleTest.js';
 import Test from '../models/Test.js';
+import Sample from '../models/Sample.js';
 import {
   getResultEmailContext,
   queueNotificationDelivery,
@@ -239,6 +240,27 @@ export const approveResult = async (
     // Update sample test status to approved
     if (resultWithSampleTest.SampleTest) {
       await resultWithSampleTest.SampleTest.update({ status: 'Approved' });
+
+      // If all tests for this sample are approved, update Sample status to 'Released' and stage to 'Completed'
+      const sampleId = resultWithSampleTest.SampleTest.sample_id;
+      if (sampleId) {
+        const allTests = await SampleTest.findAll({
+          where: { sample_id: sampleId },
+        });
+        const allApproved = allTests.every((t) => t.status === 'Approved');
+        if (allApproved) {
+          await Sample.update(
+            {
+              current_status: 'Released',
+              current_stage: 'Completed',
+              updated_at: new Date(),
+            },
+            {
+              where: { id: sampleId },
+            }
+          );
+        }
+      }
     }
 
     const emailContext = await getResultEmailContext(result.sample_test_id);

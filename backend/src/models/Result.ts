@@ -86,5 +86,6 @@ Result.init(
 );
 
 Result.belongsTo(SampleTest, { foreignKey: 'sample_test_id' });
+SampleTest.hasOne(Result, { foreignKey: 'sample_test_id' });
 
 export default Result;

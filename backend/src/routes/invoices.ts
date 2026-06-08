@@ -21,7 +21,7 @@ router.post(
 router.get(
   '/',
   authMiddleware,
-  roleMiddleware(['receptionist', 'admin', 'manager']),
+  roleMiddleware(['receptionist', 'admin', 'manager', 'patient']),
   invoiceController.getInvoices
 );
 

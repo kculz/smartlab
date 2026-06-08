@@ -66,7 +66,13 @@ export const getDashboardSummary = async (req: Request, res: Response): Promise<
         include: [
           {
             model: SampleTest,
-            include: [{ model: Test }],
+            include: [
+              { model: Test },
+              {
+                model: Sample,
+                include: [{ model: Patient, attributes: ['id', 'first_name', 'last_name'] }],
+              },
+            ],
           },
         ],
         order: [['created_at', 'DESC']],

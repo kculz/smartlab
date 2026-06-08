@@ -4,6 +4,7 @@ import Sample from '../models/Sample.js';
 import SampleTest from '../models/SampleTest.js';
 import Patient from '../models/Patient.js';
 import Test from '../models/Test.js';
+import Result from '../models/Result.js';
 import {
   getSampleEmailContext,
   queueNotificationDelivery,
@@ -160,17 +161,36 @@ export const getSamples = async (
   res: Response
 ): Promise<void> => {
   try {
-    logInfo('Get samples request started', { query: req.query });
+    logInfo('Get samples request started', { query: req.query, user: (req as any).user });
     const { status, patient_id, limit = 10, offset = 0 } = req.query;
 
     const where: any = {};
     if (status) where.current_status = status;
-    if (patient_id) where.patient_id = patient_id;
+
+    // Security check: restrict patients to only fetch their own samples
+    if ((req as any).user?.role === 'patient') {
+      const patient = await Patient.findOne({ where: { user_id: (req as any).user.userId } });
+      if (!patient) {
+        logWarn('Get samples failed: patient profile not found for user', { userId: (req as any).user.userId });
+        res.status(404).json({ success: false, message: 'Patient profile not found' });
+        return;
+      }
+      where.patient_id = patient.id;
+    } else if (patient_id) {
+      where.patient_id = patient_id;
+    }
 
     const { count, rows } = await Sample.findAndCountAll({
       where,
       include: [
         { model: Patient, attributes: ['id', 'first_name', 'last_name', 'email'] },
+        {
+          model: SampleTest,
+          include: [
+            { model: Test },
+            { model: Result }
+          ],
+        },
       ],
       limit: parseInt(limit as string),
       offset: parseInt(offset as string),
@@ -203,7 +223,10 @@ export const getSample = async (req: Request, res: Response): Promise<void> => {
         { model: Patient },
         {
           model: SampleTest,
-          include: [{ model: Test }],
+          include: [
+            { model: Test },
+            { model: Result }
+          ],
         },
       ],
     });
@@ -331,7 +354,10 @@ export const trackSample = async (
       include: [
         {
           model: SampleTest,
-          include: [{ model: Test }],
+          include: [
+            { model: Test },
+            { model: Result }
+          ],
         },
       ],
     });
