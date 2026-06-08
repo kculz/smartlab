@@ -67,6 +67,8 @@ EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_ENABLED=true
 EMAIL_TRANSPORT=smtp
+EMAIL_SECURE=false
+EMAIL_TLS_REJECT_UNAUTHORIZED=true
 EMAIL_USER=your-email@gmail.com
 EMAIL_PASSWORD=your-app-specific-password
 EMAIL_FROM=noreply@smartlab.local
@@ -183,6 +185,12 @@ To force the SSL port while testing:
 ```bash
 npm run test:email -- --port 465 --secure true --to your-email@example.com
 ```
+
+If your SMTP server uses a self-signed certificate, you can test with:
+```env
+EMAIL_TLS_REJECT_UNAUTHORIZED=false
+```
+Only use that for local/dev testing or if you trust the server.
 
 ## Next Steps
 

@@ -96,11 +96,15 @@ function resolveInitialDeliveryState(): DeliveryState {
 
 function createSmtpTransport() {
   const port = parseInt(process.env.EMAIL_PORT || '587', 10);
+  const rejectUnauthorized = parseBooleanSetting(process.env.EMAIL_TLS_REJECT_UNAUTHORIZED, true);
 
   return nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
     port,
     secure: parseBooleanSetting(process.env.EMAIL_SECURE, port === 465),
+    tls: {
+      rejectUnauthorized,
+    },
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD,

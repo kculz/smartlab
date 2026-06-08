@@ -7,6 +7,7 @@ type TestEmailConfig = {
   host: string;
   port: number;
   secure: boolean;
+  rejectUnauthorized: boolean;
   user: string;
   pass: string;
   from: string;
@@ -57,12 +58,16 @@ const buildConfig = (): TestEmailConfig => {
   const port = Number.parseInt(portInput, 10);
   const secureInput = parseArgValue('--secure') ?? process.env.EMAIL_SECURE;
   const secure = parseBoolean(secureInput, port === 465);
+  const rejectUnauthorizedInput =
+    parseArgValue('--reject-unauthorized') ?? process.env.EMAIL_TLS_REJECT_UNAUTHORIZED;
+  const rejectUnauthorized = parseBoolean(rejectUnauthorizedInput, true);
   const recipient = parseArgValue('--to') || process.env.EMAIL_TEST_RECIPIENT?.trim();
 
   return {
     host,
     port,
     secure,
+    rejectUnauthorized,
     user,
     pass,
     from,
@@ -96,6 +101,7 @@ const main = async (): Promise<void> => {
     host: config.host,
     port: config.port,
     secure: config.secure,
+    rejectUnauthorized: config.rejectUnauthorized,
     user: formatMaskedValue(config.user),
     from: config.from,
     recipient: config.recipient || '[not set]',
@@ -105,6 +111,9 @@ const main = async (): Promise<void> => {
     host: config.host,
     port: config.port,
     secure: config.secure,
+    tls: {
+      rejectUnauthorized: config.rejectUnauthorized,
+    },
     auth: {
       user: config.user,
       pass: config.pass,
@@ -150,6 +159,13 @@ const main = async (): Promise<void> => {
         'Hint: the server is rejecting the login, so this is usually an EMAIL_USER / EMAIL_PASSWORD problem rather than a port problem.'
       );
       console.error('Try the secure SSL port with: npm run test:email -- --port 465 --secure true --to your-email@example.com');
+    } else if (
+      mailError?.code === 'ESOCKET' &&
+      /self-signed certificate|unable to verify/i.test(mailError?.message || '')
+    ) {
+      console.error(
+        'Hint: the SMTP server is presenting an untrusted certificate. If this is your own mail server, set EMAIL_TLS_REJECT_UNAUTHORIZED=false for local testing or install a trusted certificate chain on the server.'
+      );
     }
 
     process.exitCode = 1;
